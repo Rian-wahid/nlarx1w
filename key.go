@@ -3,8 +3,9 @@ package nlarx1w
 import (
 	"encoding/binary"
 	"errors"
+	"unsafe"
 )
-
+type ptUint64 func (b []byte,n uint64);
 type blockKey struct{
 
 	   k1,k2,k3 uint64
@@ -13,6 +14,7 @@ type blockKey struct{
 	kc,kd,ke,kf uint64
 
 	counter uint64
+	isLe bool
 }
 
 
@@ -77,7 +79,11 @@ func newBlockKey(key,nonce []byte) (*blockKey,error){
 	k.kd=binary.LittleEndian.Uint64(buf[104:112])
 	k.ke=binary.LittleEndian.Uint64(buf[112:120])
 	k.kf=binary.LittleEndian.Uint64(buf[120:128])
-		
+
+	//check system endian
+	var n uint16=0x00ff
+	b:=(*byte)(unsafe.Pointer(&n))
+	k.isLe=*b==0xff
 	return k,nil
 }
 
@@ -85,7 +91,8 @@ func (k *blockKey) nextKeyStream(counter uint64,dst []byte)error{
 	if len(dst)<BlockSize {
 		return errors.New("nlarx1w: wrong dst size")
 	}
-
+	ds:=(*[16]uint64)(unsafe.Pointer(&dst[0]))[:]
+	
 	   k1,k2,k3:=k.k1,k.k2,k.k3
 	k4,k5,k6,k7:=k.k4,k.k5,k.k6,k.k7
 	k8,k9,ka,kb:=k.k8,k.k9,k.ka,k.kb
@@ -93,58 +100,149 @@ func (k *blockKey) nextKeyStream(counter uint64,dst []byte)error{
 
 	
 	//first round
-	counter,k3,k8,kb=oneWay(counter,k3,k4,k7)
+	counter,k3,k4,k7=oneWay(counter,k3,k4,k7)
 
+	//first column and last column round
+	counter,k4,k8,kc=mix(counter,k4,k8,kc)
+	k3,k7,kb,kf=mix(k3,k7,kb,kf)
+	
 	//diagonal round
-	counter,k5,ka,kf=oneWay(counter,k5,ka,kf)
-	k3,k6,k9,kc=oneWay(k3,k6,k9,kc)
+	counter,k5,ka,kf=mix(counter,k5,ka,kf)
+	k3,k6,k9,kc=mix(k3,k6,k9,kc)
 
 	//ring round
-	k1,k7,ke,k8=oneWay(k1,k7,ke,k8)
-	k2,kb,kd,k4=oneWay(k2,kb,kd,k4)
-	
-	
-	for i:=0; i<3; i++{
-		//diagonal round
-		counter,k5,ka,kf=mix(counter,k5,ka,kf)
-		k3,k6,k9,kc=mix(k3,k6,k9,kc)
+	k1,k7,ke,k8=mix(k1,k7,ke,k8)
+	k2,kb,kd,k4=mix(k2,kb,kd,k4)
 
-		counter=(counter<<31)|(counter>>33)
-		k3=(k3<<27)|(k3>>37)
-		kc=(kc<<23)|(kc>>41)
-		kf=(kf<<19)|(kf>>45)
-		k5=(k5<<15)|(k5>>49)
-		k6=(k6<<11)|(k6>>53)
-		k9=(k9<<7)|(k9>>57)
-		ka=(ka<<5)|(ka>>59)
+	counter=(counter<<31)|(counter>>33)
+	k3=(k3<<27)|(k3>>37)
+	kc=(kc<<23)|(kc>>41)
+	kf=(kf<<19)|(kf>>45)
+	k5=(k5<<15)|(k5>>49)
+	k6=(k6<<11)|(k6>>53)
+	k9=(k9<<7)|(k9>>57)
+	ka=(ka<<5)|(ka>>59)
 
-		//diagonal round 2
-		k1,k6,kb,kc=mix(k1,k6,kb,kc)
-		k2,k5,k8,kf=mix(k2,k5,k8,kf)
-		kd,ka,k7,counter=mix(kd,ka,k7,counter)
-		ke,k9,k4,k3=mix(ke,k9,k4,k3)
+	k1=(k1<<31)|(k1>>33)
+	k2=(k2<<27)|(k2>>37)
+	k7=(k7<<23)|(k7>>41)
+	kb=(kb<<19)|(kb>>45)
+	ke=(ke<<15)|(ke>>49)
+	kd=(kd<<11)|(kd>>53)
+	k8=(k8<<7)|(k8>>57)
+	k4=(k4<<5)|(k4>>59)
+
+	//diagonal round 2
+	k1,k6,kb,kc=mix(k1,k6,kb,kc)
+	k2,k5,k8,kf=mix(k2,k5,k8,kf)
+	kd,ka,k7,counter=mix(kd,ka,k7,counter)
+	ke,k9,k4,k3=mix(ke,k9,k4,k3)
+
+	counter=(counter<<31)|(counter>>33)
+	k3=(k3<<27)|(k3>>37)
+	kc=(kc<<23)|(kc>>41)
+	kf=(kf<<19)|(kf>>45)
+	k5=(k5<<15)|(k5>>49)
+	k6=(k6<<11)|(k6>>53)
+	k9=(k9<<7)|(k9>>57)
+	ka=(ka<<5)|(ka>>59)
+
+	k1=(k1<<31)|(k1>>33)
+	k2=(k2<<27)|(k2>>37)
+	k7=(k7<<23)|(k7>>41)
+	kb=(kb<<19)|(kb>>45)
+	ke=(ke<<15)|(ke>>49)
+	kd=(kd<<11)|(kd>>53)
+	k8=(k8<<7)|(k8>>57)
+	k4=(k4<<5)|(k4>>59)
+
+	//column round
+	counter,k4,k8,kc=mix(counter,k4,k8,kc)
+	k1,k5,k9,kd=mix(k1,k5,k9,kd)
+	k2,k6,ka,ke=mix(k2,k6,ka,ke)
+	k3,k7,kb,kf=mix(k3,k7,kb,kf)
+
+	counter=(counter<<31)|(counter>>33)
+	k3=(k3<<27)|(k3>>37)
+	kc=(kc<<23)|(kc>>41)
+	kf=(kf<<19)|(kf>>45)
+	k5=(k5<<15)|(k5>>49)
+	k6=(k6<<11)|(k6>>53)
+	k9=(k9<<7)|(k9>>57)
+	ka=(ka<<5)|(ka>>59)
+
+	k1=(k1<<31)|(k1>>33)
+	k2=(k2<<27)|(k2>>37)
+	k7=(k7<<23)|(k7>>41)
+	kb=(kb<<19)|(kb>>45)
+	ke=(ke<<15)|(ke>>49)
+	kd=(kd<<11)|(kd>>53)
+	k8=(k8<<7)|(k8>>57)
+	k4=(k4<<5)|(k4>>59)
 
 
-		//ring round
-		k1,k7,ke,k8=mix(k1,k7,ke,k8)
-		k2,kb,kd,k4=mix(k2,kb,kd,k4)
-		
-		k1=(k1<<31)|(k1>>33)
-		k2=(k2<<27)|(k2>>37)
-		k7=(k7<<23)|(k7>>41)
-		kb=(kb<<19)|(kb>>45)
-		ke=(ke<<15)|(ke>>49)
-		kd=(kd<<11)|(kd>>53)
-		k8=(k8<<7)|(k8>>57)
-		k4=(k4<<5)|(k4>>59)
-		
-		//column round
-		counter,k4,k8,kc=mix(counter,k4,k8,kc)
-		k1,k5,k9,kd=mix(k1,k5,k9,kd)
-		k2,k6,ka,ke=mix(k2,k6,ka,ke)
-		k3,k7,kb,kf=mix(k3,k7,kb,kf)
+
+	//diagonal round
+	counter,k5,ka,kf=mix(counter,k5,ka,kf)
+	k3,k6,k9,kc=mix(k3,k6,k9,kc)
+
+	//ring round
+	k1,k7,ke,k8=mix(k1,k7,ke,k8)
+	k2,kb,kd,k4=mix(k2,kb,kd,k4)
+
+	counter=(counter<<31)|(counter>>33)
+	k3=(k3<<27)|(k3>>37)
+	kc=(kc<<23)|(kc>>41)
+	kf=(kf<<19)|(kf>>45)
+	k5=(k5<<15)|(k5>>49)
+	k6=(k6<<11)|(k6>>53)
+	k9=(k9<<7)|(k9>>57)
+	ka=(ka<<5)|(ka>>59)
+
+	k1=(k1<<31)|(k1>>33)
+	k2=(k2<<27)|(k2>>37)
+	k7=(k7<<23)|(k7>>41)
+	kb=(kb<<19)|(kb>>45)
+	ke=(ke<<15)|(ke>>49)
+	kd=(kd<<11)|(kd>>53)
+	k8=(k8<<7)|(k8>>57)
+	k4=(k4<<5)|(k4>>59)
+
+	//diagonal round 2
+	k1,k6,kb,kc=mix(k1,k6,kb,kc)
+	k2,k5,k8,kf=mix(k2,k5,k8,kf)
+	kd,ka,k7,counter=mix(kd,ka,k7,counter)
+	ke,k9,k4,k3=mix(ke,k9,k4,k3)
+
+	//column round
+	counter,k4,k8,kc=mix(counter,k4,k8,kc)
+	k1,k5,k9,kd=mix(k1,k5,k9,kd)
+	k2,k6,ka,ke=mix(k2,k6,ka,ke)
+	k3,k7,kb,kf=mix(k3,k7,kb,kf)
+
+
+
+
+	if k.isLe {
+		ds[0]=counter
+		ds[1]=k1
+		ds[2]=k2
+		ds[3]=k3
+		ds[4]=k4
+		ds[5]=k5
+		ds[6]=k6
+		ds[7]=k7
+		ds[8]=k8
+		ds[9]=k9
+		ds[10]=ka
+		ds[11]=kb
+		ds[12]=kc
+		ds[13]=kd
+		ds[14]=ke
+		ds[15]=kf
+		return nil
+
 	}
-
 	
 	binary.LittleEndian.PutUint64(dst[:8],counter)
 	binary.LittleEndian.PutUint64(dst[8:16],k1)
@@ -166,4 +264,6 @@ func (k *blockKey) nextKeyStream(counter uint64,dst []byte)error{
 	return nil
 
 }
+
+
 
