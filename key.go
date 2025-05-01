@@ -5,7 +5,7 @@ import (
 	"errors"
 	"unsafe"
 )
-type ptUint64 func (b []byte,n uint64);
+
 type blockKey struct{
 
 	   k1,k2,k3 uint64
@@ -14,7 +14,6 @@ type blockKey struct{
 	kc,kd,ke,kf uint64
 
 	counter uint64
-	isLe bool
 }
 
 
@@ -80,10 +79,6 @@ func newBlockKey(key,nonce []byte) (*blockKey,error){
 	k.ke=binary.LittleEndian.Uint64(buf[112:120])
 	k.kf=binary.LittleEndian.Uint64(buf[120:128])
 
-	//check system endian
-	var n uint16=0x00ff
-	b:=(*byte)(unsafe.Pointer(&n))
-	k.isLe=*b==0xff
 	return k,nil
 }
 
@@ -223,44 +218,23 @@ func (k *blockKey) nextKeyStream(counter uint64,dst []byte)error{
 
 
 
-	if k.isLe {
-		ds[0]=counter
-		ds[1]=k1
-		ds[2]=k2
-		ds[3]=k3
-		ds[4]=k4
-		ds[5]=k5
-		ds[6]=k6
-		ds[7]=k7
-		ds[8]=k8
-		ds[9]=k9
-		ds[10]=ka
-		ds[11]=kb
-		ds[12]=kc
-		ds[13]=kd
-		ds[14]=ke
-		ds[15]=kf
-		return nil
-
-	}
 	
-	binary.LittleEndian.PutUint64(dst[:8],counter)
-	binary.LittleEndian.PutUint64(dst[8:16],k1)
-	binary.LittleEndian.PutUint64(dst[16:24],k2)
-	binary.LittleEndian.PutUint64(dst[24:32],k3)
-	binary.LittleEndian.PutUint64(dst[32:40],k4)
-	binary.LittleEndian.PutUint64(dst[40:48],k5)
-	binary.LittleEndian.PutUint64(dst[48:56],k6)
-	binary.LittleEndian.PutUint64(dst[56:64],k7)
-	binary.LittleEndian.PutUint64(dst[64:72],k8)
-	binary.LittleEndian.PutUint64(dst[72:80],k9)
-	binary.LittleEndian.PutUint64(dst[80:88],ka)
-	binary.LittleEndian.PutUint64(dst[88:96],kb)
-	binary.LittleEndian.PutUint64(dst[96:104],kc)
-	binary.LittleEndian.PutUint64(dst[104:112],kd)
-	binary.LittleEndian.PutUint64(dst[112:120],ke)
-	binary.LittleEndian.PutUint64(dst[120:128],kf)
-	
+	ds[0]=counter
+	ds[1]=k1
+	ds[2]=k2
+	ds[3]=k3
+	ds[4]=k4
+	ds[5]=k5
+	ds[6]=k6
+	ds[7]=k7
+	ds[8]=k8
+	ds[9]=k9
+	ds[10]=ka
+	ds[11]=kb
+	ds[12]=kc
+	ds[13]=kd
+	ds[14]=ke
+	ds[15]=kf
 	return nil
 
 }
