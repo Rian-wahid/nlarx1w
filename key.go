@@ -14,6 +14,7 @@ type blockKey struct{
 	kc,kd,ke,kf uint64
 
 	counter uint64
+	isLe bool
 }
 
 
@@ -61,7 +62,11 @@ func newBlockKey(key,nonce []byte) (*blockKey,error){
 
 
 	buf:=make([]byte,BlockSize)
+	var n uint16=0x00ff
+	s:=(*byte)(unsafe.Pointer(&n))
+	k.isLe=*s==0xff
 	k.nextKeyStream(0,buf)
+
 	k.counter=(binary.LittleEndian.Uint64(buf[:8])>>16)
 	k.k1=binary.LittleEndian.Uint64(buf[8:16])
 	k.k2=binary.LittleEndian.Uint64(buf[16:24])
@@ -218,6 +223,25 @@ func (k *blockKey) nextKeyStream(counter uint64,dst []byte)error{
 
 
 
+	if !k.isLe {
+
+		counter=toLittleEndian(counter)
+		k1=toLittleEndian(k1)
+		k2=toLittleEndian(k2)
+		k3=toLittleEndian(k3)
+		k4=toLittleEndian(k4)
+		k5=toLittleEndian(k5)
+		k6=toLittleEndian(k6)
+		k7=toLittleEndian(k7)
+		k8=toLittleEndian(k8)
+		k9=toLittleEndian(k9)
+		ka=toLittleEndian(ka)
+		kb=toLittleEndian(kb)
+		kc=toLittleEndian(kc)
+		kd=toLittleEndian(kd)
+		ke=toLittleEndian(ke)
+		kf=toLittleEndian(kf)
+	}
 	
 	ds[0]=counter
 	ds[1]=k1
@@ -236,8 +260,16 @@ func (k *blockKey) nextKeyStream(counter uint64,dst []byte)error{
 	ds[14]=ke
 	ds[15]=kf
 	return nil
-
 }
 
 
-
+func toLittleEndian(n uint64)uint64{
+	var s [8]byte
+	r:=(*uint64)(unsafe.Pointer(&s[0]))
+	*r=n
+	s[0],s[7]=s[7],s[0]
+	s[1],s[6]=s[6],s[1]
+	s[2],s[5]=s[5],s[2]
+	s[3],s[4]=s[4],s[3]
+	return *r
+}

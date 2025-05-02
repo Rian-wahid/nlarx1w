@@ -97,6 +97,10 @@ func (c *Cipher) XORKeyStream(dst,src []byte){
 		if srclen>=bsx8 {
 			i:=0
 			for ; i<srclen; i+=bsx8 {
+				if i+bsx8>srclen {
+					i+=bsx8
+					break
+				}
 				c.xorKeyStreamBig(dst[i:],src[i:])
 			}
 			if i==srclen {
